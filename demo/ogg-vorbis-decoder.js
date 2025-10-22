@@ -4261,7 +4261,7 @@ FÁð]NôÝ'= qr(¶ù¤nü«òÿ¿d&ÿÈõT4Þ=}z|ö ¿OW×SMtd
       new WASMAudioDecoderCommon();
 
       this._init();
-      this[setDecoderClass](Decoder);
+      this._ready = this[setDecoderClass](Decoder);
     }
 
     _init() {
@@ -4273,14 +4273,14 @@ FÁð]NôÝ'= qr(¶ù¤nü«òÿ¿d&ÿÈõT4Þ=}z|ö ¿OW×SMtd
       });
     }
 
-    [setDecoderClass](decoderClass) {
+    async [setDecoderClass](decoderClass) {
       if (this._decoder) {
         const oldDecoder = this._decoder;
-        oldDecoder.ready.then(() => oldDecoder.free());
+        await oldDecoder.ready.then(() => oldDecoder.free());
       }
 
       this._decoder = new decoderClass();
-      this._ready = this._decoder.ready;
+      return this._decoder.ready;
     }
 
     get ready() {
@@ -4388,11 +4388,11 @@ FÁð]NôÝ'= qr(¶ù¤nü«òÿ¿d&ÿÈõT4Þ=}z|ö ¿OW×SMtd
     constructor() {
       super();
 
-      super[setDecoderClass](DecoderWorker);
+      this._ready = super[setDecoderClass](DecoderWorker);
     }
 
     async free() {
-      super.free();
+      await this._decoder.free();
     }
 
     terminate() {

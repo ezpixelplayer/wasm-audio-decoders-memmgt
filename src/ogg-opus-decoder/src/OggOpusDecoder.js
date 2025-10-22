@@ -73,6 +73,7 @@ export default class OggOpusDecoder {
   async _init() {
     if (this._decoder) await this._decoder.free();
     this._decoder = null;
+    this._decoderReady = null;
 
     this._codecParser = new CodecParser("application/ogg", {
       onCodec: this._onCodec,
@@ -110,7 +111,7 @@ export default class OggOpusDecoder {
   }
 
   free() {
-    this._ready = this._init();
+    if (this._decoder) this._decoder.free();
   }
 
   async _decode(oggPages) {
@@ -143,7 +144,7 @@ export default class OggOpusDecoder {
       if (frames.length) {
         opusFrames.push(...frames);
 
-        if (!this._decoder)
+        if (!this._decoderReady)
           // wait until there is an Opus header before instantiating
           this._decoderReady = this._instantiateDecoder(
             oggPage[codecFrames][0][header],

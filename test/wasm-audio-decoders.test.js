@@ -61,6 +61,7 @@ const test_decode = async (
   outputFileName,
   expectedPathModifiers = [],
   actualPathModifiers = [],
+  shouldFree = true,
 ) => {
   try {
     if (decoder.constructor.name.match(/WebWorker/))
@@ -85,7 +86,9 @@ const test_decode = async (
 
     return { paths, result };
   } finally {
-    decoder.free();
+    if (shouldFree) {
+      await decoder.free();
+    }
   }
 };
 
@@ -120,9 +123,7 @@ const test_decodeChunks = async (
         chunkSize,
       ),
     )
-    .finally(() => {
-      decoder.free();
-    });
+    .finally(() => decoder.free());
 
   return { paths, result };
 };
@@ -194,17 +195,17 @@ const test_decodeFrame = async (
     actualPathModifiers,
   );
 
-  const result = await decoder.ready.then(() =>
-    testDecoder_decodeFrame(
-      decoder,
-      testName,
-      frames,
-      framesLength,
-      paths.actualPath,
-    ),
-  );
-
-  decoder.free();
+  const result = await decoder.ready
+    .then(() =>
+      testDecoder_decodeFrame(
+        decoder,
+        testName,
+        frames,
+        framesLength,
+        paths.actualPath,
+      ),
+    )
+    .finally(() => decoder.free());
 
   return { paths, result };
 };
@@ -228,17 +229,17 @@ const test_decodeFrames = async (
     actualPathModifiers,
   );
 
-  const result = await decoder.ready.then(() =>
-    testDecoder_decodeFrames(
-      decoder,
-      testName,
-      frames,
-      framesLength,
-      paths.actualPath,
-    ),
-  );
-
-  decoder.free();
+  const result = await decoder.ready
+    .then(() =>
+      testDecoder_decodeFrames(
+        decoder,
+        testName,
+        frames,
+        framesLength,
+        paths.actualPath,
+      ),
+    )
+    .finally(() => decoder.free());
 
   return { paths, result };
 };
@@ -346,19 +347,21 @@ describe("wasm-audio-decoders", () => {
   });
 
   describe("mpg123-decoder", () => {
-    it("should have name as an instance and static property for MPEGDecoder", () => {
+    it("should have name as an instance and static property for MPEGDecoder", async () => {
       const decoder = new MPEGDecoder();
       const name = decoder.constructor.name;
-      decoder.ready.then(() => decoder.free());
+      await decoder.ready;
+      decoder.free();
 
       expect(name).toEqual("MPEGDecoder");
       expect(MPEGDecoder.name).toEqual("MPEGDecoder");
     });
 
-    it("should have name as an instance and static property for MPEGDecoderWebWorker", () => {
+    it("should have name as an instance and static property for MPEGDecoderWebWorker", async () => {
       const decoder = new MPEGDecoderWebWorker();
       const name = decoder.constructor.name;
-      decoder.ready.then(() => decoder.free());
+      await decoder.ready;
+      await decoder.free();
 
       expect(name).toEqual("MPEGDecoderWebWorker");
       expect(MPEGDecoderWebWorker.name).toEqual("MPEGDecoderWebWorker");
@@ -967,19 +970,21 @@ describe("wasm-audio-decoders", () => {
         );
     });
 
-    it("should have name as an instance and static property for OpusDecoder", () => {
+    it("should have name as an instance and static property for OpusDecoder", async () => {
       const decoder = new OpusDecoder();
       const name = decoder.constructor.name;
-      decoder.ready.then(() => decoder.free());
+      await decoder.ready;
+      decoder.free();
 
       expect(name).toEqual("OpusDecoder");
       expect(OpusDecoder.name).toEqual("OpusDecoder");
     });
 
-    it("should have name as an instance and static property for OpusDecoderWebWorker", () => {
+    it("should have name as an instance and static property for OpusDecoderWebWorker", async () => {
       const decoder = new OpusDecoderWebWorker();
       const name = decoder.constructor.name;
-      decoder.ready.then(() => decoder.free());
+      await decoder.ready;
+      await decoder.free();
 
       expect(name).toEqual("OpusDecoderWebWorker");
       expect(OpusDecoderWebWorker.name).toEqual("OpusDecoderWebWorker");
@@ -1694,19 +1699,21 @@ describe("wasm-audio-decoders", () => {
       return [frames, header, length, Number(absoluteGranulePosition)];
     };
 
-    it("should have name as an instance and static property for OpusMLDecoder", () => {
+    it("should have name as an instance and static property for OpusMLDecoder", async () => {
       const decoder = new OpusMLDecoder();
       const name = decoder.constructor.name;
-      decoder.ready.then(() => decoder.free());
+      await decoder.ready;
+      decoder.free();
 
       expect(name).toEqual("OpusMLDecoder");
       expect(OpusMLDecoder.name).toEqual("OpusMLDecoder");
     });
 
-    it("should have name as an instance and static property for OpusMLDecoderWebWorker", () => {
+    it("should have name as an instance and static property for OpusMLDecoderWebWorker", async () => {
       const decoder = new OpusMLDecoderWebWorker();
       const name = decoder.constructor.name;
-      decoder.ready.then(() => decoder.free());
+      await decoder.ready;
+      await decoder.free();
 
       expect(name).toEqual("OpusMLDecoderWebWorker");
       expect(OpusMLDecoderWebWorker.name).toEqual("OpusMLDecoderWebWorker");
@@ -1816,19 +1823,21 @@ describe("wasm-audio-decoders", () => {
   });
 
   describe("ogg-opus-decoder", () => {
-    it("should have name as an instance and static property for OggOpusDecoder", () => {
+    it("should have name as an instance and static property for OggOpusDecoder", async () => {
       const decoder = new OggOpusDecoder();
       const name = decoder.constructor.name;
-      decoder.ready.then(() => decoder.free());
+      await decoder.ready;
+      decoder.free();
 
       expect(name).toEqual("OggOpusDecoder");
       expect(OggOpusDecoder.name).toEqual("OggOpusDecoder");
     });
 
-    it("should have name as an instance and static property for OggOpusDecoderWebWorker", () => {
+    it("should have name as an instance and static property for OggOpusDecoderWebWorker", async () => {
       const decoder = new OggOpusDecoderWebWorker();
       const name = decoder.constructor.name;
-      decoder.ready.then(() => decoder.free());
+      await decoder.ready;
+      await decoder.free();
 
       expect(name).toEqual("OggOpusDecoderWebWorker");
       expect(OggOpusDecoderWebWorker.name).toEqual("OggOpusDecoderWebWorker");
@@ -1839,6 +1848,25 @@ describe("wasm-audio-decoders", () => {
         new OggOpusDecoder(),
         "decodeFile",
         "should decode ogg opus",
+        opusStereoTestFile,
+      );
+
+      const [actual, expected] = await Promise.all([
+        fs.readFile(paths.actualPath),
+        fs.readFile(paths.expectedPath),
+      ]);
+
+      expect(result.samplesDecoded).toEqual(3806842);
+      expect(result.sampleRate).toEqual(48000);
+      expect(actual.length).toEqual(expected.length);
+      expect(Buffer.compare(actual, expected)).toEqual(0);
+    });
+
+    it("should decode ogg opus web worker", async () => {
+      const { paths, result } = await test_decode(
+        new OggOpusDecoderWebWorker(),
+        "decodeFile",
+        "should decode ogg opus web worker",
         opusStereoTestFile,
       );
 
@@ -1864,6 +1892,7 @@ describe("wasm-audio-decoders", () => {
         opusStereoTestFile,
         [],
         ["two_invocations", "1"],
+        false,
       );
 
       await decoder.reset();
@@ -1910,6 +1939,7 @@ describe("wasm-audio-decoders", () => {
         opusStereoTestFile,
         [],
         ["two_invocations_worker", "1"],
+        false,
       );
 
       await decoder.reset();
@@ -2538,19 +2568,21 @@ describe("wasm-audio-decoders", () => {
       );
     });
 
-    it("should have name as an instance and static property for FLACDecoder", () => {
+    it("should have name as an instance and static property for FLACDecoder", async () => {
       const decoder = new FLACDecoder();
       const name = decoder.constructor.name;
-      decoder.ready.then(() => decoder.free());
+      await decoder.ready;
+      decoder.free();
 
       expect(name).toEqual("FLACDecoder");
       expect(FLACDecoder.name).toEqual("FLACDecoder");
     });
 
-    it("should have name as an instance and static property for FLACDecoderWebWorker", () => {
+    it("should have name as an instance and static property for FLACDecoderWebWorker", async () => {
       const decoder = new FLACDecoderWebWorker();
       const name = decoder.constructor.name;
-      decoder.ready.then(() => decoder.free());
+      await decoder.ready;
+      await decoder.free();
 
       expect(name).toEqual("FLACDecoderWebWorker");
       expect(FLACDecoderWebWorker.name).toEqual("FLACDecoderWebWorker");
@@ -2939,19 +2971,21 @@ describe("wasm-audio-decoders", () => {
   });
 
   describe("ogg-vorbis-decoder", () => {
-    it("should have name as an instance and static property for OggVorbisDecoder", () => {
+    it("should have name as an instance and static property for OggVorbisDecoder", async () => {
       const decoder = new OggVorbisDecoder();
       const name = decoder.constructor.name;
-      decoder.ready.then(() => decoder.free());
+      await decoder.ready;
+      decoder.free();
 
       expect(name).toEqual("OggVorbisDecoder");
       expect(OggVorbisDecoder.name).toEqual("OggVorbisDecoder");
     });
 
-    it("should have name as an instance and static property for OggVorbisDecoderWebWorker", () => {
+    it("should have name as an instance and static property for OggVorbisDecoderWebWorker", async () => {
       const decoder = new OggVorbisDecoderWebWorker();
       const name = decoder.constructor.name;
-      decoder.ready.then(() => decoder.free());
+      await decoder.ready;
+      await decoder.free();
 
       expect(name).toEqual("OggVorbisDecoderWebWorker");
       expect(OggVorbisDecoderWebWorker.name).toEqual(
