@@ -4427,7 +4427,7 @@ H¬ñÀ£¿[ÆW¥e|°²!Ùk¾¾uC^@0pvVr^v2ßà¾á"ÚîäÎÞ	�
     }
 
     async free() {
-      super.free();
+      await this._decoder.free();
     }
 
     terminate() {
