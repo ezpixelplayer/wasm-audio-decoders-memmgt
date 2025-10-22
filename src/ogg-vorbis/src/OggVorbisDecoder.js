@@ -184,7 +184,7 @@ export default class OggVorbisDecoder {
     new WASMAudioDecoderCommon();
 
     this._init();
-    this[setDecoderClass](Decoder);
+    this._ready = this[setDecoderClass](Decoder);
   }
 
   _init() {
@@ -196,14 +196,14 @@ export default class OggVorbisDecoder {
     });
   }
 
-  [setDecoderClass](decoderClass) {
+  async [setDecoderClass](decoderClass) {
     if (this._decoder) {
       const oldDecoder = this._decoder;
-      oldDecoder.ready.then(() => oldDecoder.free());
+      await oldDecoder.ready.then(() => oldDecoder.free());
     }
 
     this._decoder = new decoderClass();
-    this._ready = this._decoder.ready;
+    return this._decoder.ready;
   }
 
   get ready() {
