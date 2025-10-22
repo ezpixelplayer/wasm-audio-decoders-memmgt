@@ -12,6 +12,6 @@ export default class OggOpusDecoderWebWorker extends OggOpusDecoder {
   }
 
   async free() {
-    await super.reset();
+    if (this._decoder) await this._decoder.free();
   }
 }
