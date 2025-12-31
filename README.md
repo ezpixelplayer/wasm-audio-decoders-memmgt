@@ -6,6 +6,9 @@ Web Assembly is a binary instruction format for a stack-based virtual machine th
 
 ### [Checkout the demo here](https://eshaz.github.io/wasm-audio-decoders/)
 
+## EZPlayer Fork Notes
+This is a fork.  The fork was made because the mpg123 implementation was allocating fresh memory for every decode, and the EZPlayer project needed to reuse the memory to keep the allocator / garbage collector from stalling the process.
+
 ## Decoders
 
 Each decoder is built with inline WASM to reduce bundling complexity with transpilers like Webpack. The inlined WASM is encoded using yEnc for efficient binary encoding and is gzip compressed for reduced file size.
@@ -73,6 +76,20 @@ Decodes Ogg Vorbis data into PCM
   * Install using [NPM](https://www.npmjs.com/@wasm-audio-decoders/ogg-vorbis)
 
 ## Developing
+
+### EZP Windows Notes (addendum to below)
+For building on Windows, ONLY WSL seems to work, and the WSL disk must be used (not a mount of the Windows disk).  Emscripten 4.0.7 must be used, 4.0.19 does not work as it produces a file that the minimizer script does not expect.
+
+```sh
+# Use explicit emscripten version
+./emsdk install 4.0.7
+./emsdk activate 4.0.7
+source ./emsdk_env.sh
+
+# Then:
+npm run configure
+npm run build
+```
 
 ### Prerequisites
 1. Linux, or a Linux-like environment to build (i.e. WSL).

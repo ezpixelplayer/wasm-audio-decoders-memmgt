@@ -1,5 +1,5 @@
 {
-  "name": "mpg123-decoder",
+  "name": "mpg123-decoder-ezp",
   "version": "1.0.3",
   "description": "Web Assembly streaming MPEG Layer I/II/III decoder",
   "type": "module",
