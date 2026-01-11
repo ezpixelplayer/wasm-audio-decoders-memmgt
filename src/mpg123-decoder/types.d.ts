@@ -56,6 +56,12 @@ export type DecodeIntoOptions = {
    * If true, reset decoder state before decoding (only if supported).
    */
   resetDecoder?: boolean;
+
+  /**
+   * Optional start position when writing into chunk arrays.
+   * Useful for streaming / multiple decode calls appending into the same chunk list.
+   */
+  startAt?: { chunkIndex: number; chunkOffset: number };
 };
 
 export type DecodeIntoResult = {
@@ -63,6 +69,16 @@ export type DecodeIntoResult = {
   sampleRate: number;
   errors: MPEGDecodedAudio["errors"];
   truncated: boolean;
+
+  /**
+   * Where the next write would continue (use as opts.startAt on the next call).
+   */
+  endAt: { chunkIndex: number; chunkOffset: number };
+
+  /**
+   * Total capacity available across all provided chunks (in samples per channel).
+   */
+  totalCapacitySamples: number;
 };
 
 export class MPEGDecoder {
@@ -81,15 +97,16 @@ export class MPEGDecoder {
   reserve(sizes?: ReserveOptions): ReserveResult;
 
   /**
-   * Low-allocation API: decode into caller-provided planar Float32 buffers (L/R).
-   * Returns how many samples were written to each channel.
+   * Low-allocation API: decode into caller-provided planar Float32 buffer chunks (L/R).
+   * Returns how many samples were written total (per channel), plus where the write ended.
    *
-   * outL.length and outR.length define the maximum samples that can be written.
+   * All chunks must be same shape: outLChunks.length === outRChunks.length and
+   * outLChunks[i].length === outRChunks[i].length.
    */
-  decodeInto(
+  decodeIntoChunks(
     mpegData: Uint8Array,
-    outL: Float32Array,
-    outR: Float32Array,
+    outLChunks: Float32Array[],
+    outRChunks: Float32Array[],
     opts?: DecodeIntoOptions
   ): DecodeIntoResult;
 }

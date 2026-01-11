@@ -205,28 +205,54 @@ export default function MPEGDecoder(options = {}) {
   };
 
   /**
-   * Decode from a Uint8Array into caller-provided Float32Arrays (L/R),
+   * Decode from a Uint8Array into caller-provided Float32Array chunk lists (L/R),
    * reusing them across calls. No per-call output allocations.
    *
-   * outL/outR are destination buffers. We write sequentially from index 0.
-   * Return value includes total samples written to outL/outR.
+   * outLChunks/outRChunks are arrays of destination buffers.
+   * Buffers must be same count, and each L[i].length must equal R[i].length.
    *
-   * NOTE: This is still "chunked feed/read" like your decode(); it just
-   * copies into outL/outR instead of allocating slices.
+   * Writes sequentially starting at [0][0] unless opts.startAt is provided.
+   *
+   * Return value includes total samples written, and final write position.
    */
-  this.decodeInto = (data, outL, outR, opts = {}) => {
+  this.decodeIntoChunks = (data, outLChunks, outRChunks, opts = {}) => {
     if (!(data instanceof Uint8Array)) {
       throw Error("Data to decode must be Uint8Array. Instead got " + typeof data);
     }
-    if (!(outL instanceof Float32Array) || !(outR instanceof Float32Array)) {
-      throw Error("outL/outR must be Float32Array");
+    if (!Array.isArray(outLChunks) || !Array.isArray(outRChunks)) {
+      throw Error("outLChunks/outRChunks must be arrays of Float32Array");
     }
-    if (outL.length !== outR.length) {
-      throw Error("outL/outR must have the same length");
+    if (outLChunks.length !== outRChunks.length) {
+      throw Error("outLChunks/outRChunks must have the same number of chunks");
+    }
+    if (outLChunks.length === 0) {
+      throw Error("outLChunks/outRChunks must not be empty");
     }
 
-    const outCap = outL.length;
-    let outOffset = 0;
+    // Validate chunk shapes and compute total capacity
+    let totalCap = 0;
+    for (let i = 0; i < outLChunks.length; i++) {
+      const l = outLChunks[i];
+      const r = outRChunks[i];
+      if (!(l instanceof Float32Array) || !(r instanceof Float32Array)) {
+        throw Error(`Chunk ${i}: outL/outR must be Float32Array`);
+      }
+      if (l.length !== r.length) {
+        throw Error(`Chunk ${i}: outL/outR must have the same length`);
+      }
+      totalCap += l.length;
+    }
+
+    // Where to start writing
+    let chunkIndex = opts.startAt?.chunkIndex ?? 0;
+    let chunkOffset = opts.startAt?.chunkOffset ?? 0;
+
+    if (chunkIndex < 0 || chunkIndex >= outLChunks.length) {
+      throw Error(`startAt.chunkIndex out of range: ${chunkIndex}`);
+    }
+    if (chunkOffset < 0 || chunkOffset > outLChunks[chunkIndex].length) {
+      throw Error(`startAt.chunkOffset out of range: ${chunkOffset}`);
+    }
 
     // Optional: caller can choose to clear decoder state per call
     if (opts.resetDecoder === true) {
@@ -235,7 +261,62 @@ export default function MPEGDecoder(options = {}) {
     }
 
     let errors = opts.collectErrors === false ? null : [];
-    let samples = 0;
+    let samplesWritten = 0;
+
+    const writePlanar = (srcL, srcR) => {
+      let srcPos = 0;
+      const srcLen = srcL.length;
+
+      // Total remaining capacity from current position
+      let remainingCap = 0;
+      for (let i = chunkIndex; i < outLChunks.length; i++) {
+        const len = outLChunks[i].length;
+        remainingCap += (i === chunkIndex ? (len - chunkOffset) : len);
+      }
+
+      if (srcLen > remainingCap) {
+        if (opts.allowPartial === true) {
+          // Trim the amount we actually copy
+          // (We’ll just stop when we run out of chunks.)
+        } else {
+          throw Error(
+            `Output buffers too small: need ${srcLen} more samples, have ${remainingCap}`
+          );
+        }
+      }
+
+      while (srcPos < srcLen && chunkIndex < outLChunks.length) {
+        const lChunk = outLChunks[chunkIndex];
+        const rChunk = outRChunks[chunkIndex];
+
+        const space = lChunk.length - chunkOffset;
+        if (space <= 0) {
+          chunkIndex++;
+          chunkOffset = 0;
+          continue;
+        }
+
+        const toCopy = Math.min(space, srcLen - srcPos);
+
+        lChunk.set(srcL.subarray(srcPos, srcPos + toCopy), chunkOffset);
+        rChunk.set(srcR.subarray(srcPos, srcPos + toCopy), chunkOffset);
+
+        srcPos += toCopy;
+        chunkOffset += toCopy;
+        samplesWritten += toCopy;
+
+        if (chunkOffset === lChunk.length) {
+          chunkIndex++;
+          chunkOffset = 0;
+        }
+      }
+
+      // If we didn’t finish copying because we ran out of chunks, signal truncation.
+      if (srcPos < srcLen) {
+        return false; // not fully copied
+      }
+      return true;
+    };
 
     // feed loop (same as your decode)
     feed: for (
@@ -275,34 +356,22 @@ export default function MPEGDecoder(options = {}) {
         this._outputSamples += samplesDecoded;
 
         if (samplesDecoded) {
-          // Your wasm writes interleaved? Based on your existing code:
-          // you slice [0:samples] and [samples:2*samples], meaning planar L then planar R.
-          // We'll copy those samples into outL/outR at outOffset.
+          // wasm output format: planar L then planar R (based on your existing slicing)
+          const srcL = this._output.buf.subarray(0, samplesDecoded);
+          const srcR = this._output.buf.subarray(samplesDecoded, samplesDecoded * 2);
 
-          if (outOffset + samplesDecoded > outCap) {
-            // Caller did not provide enough space.
-            // Choose: throw, or stop, or return partial.
-            if (opts.allowPartial === true) {
-              return {
-                samplesDecoded: samples,
-                sampleRate: this._sampleRatePtr.buf[0],
-                errors: errors || [],
-                truncated: true,
-              };
-            }
-            throw Error(
-              `Output buffers too small: need ${outOffset + samplesDecoded}, have ${outCap}`
-            );
+          const fullyCopied = writePlanar(srcL, srcR);
+          if (!fullyCopied) {
+            // we ran out of space
+            return {
+              samplesDecoded: samplesWritten,
+              sampleRate: this._sampleRatePtr.buf[0],
+              errors: errors || [],
+              truncated: true,
+              endAt: { chunkIndex, chunkOffset },
+              totalCapacitySamples: totalCap,
+            };
           }
-
-          outL.set(this._output.buf.subarray(0, samplesDecoded), outOffset);
-          outR.set(
-            this._output.buf.subarray(samplesDecoded, samplesDecoded * 2),
-            outOffset
-          );
-
-          outOffset += samplesDecoded;
-          samples += samplesDecoded;
         }
 
         if (error === -11) {
@@ -323,17 +392,18 @@ export default function MPEGDecoder(options = {}) {
               this._outputSamples
             );
           }
-          // keep going unless opts.throwOnError
           if (opts.throwOnError === true) throw Error(message);
         }
       }
     }
 
     return {
-      samplesDecoded: samples,
+      samplesDecoded: samplesWritten,
       sampleRate: this._sampleRatePtr.buf[0],
       errors: errors || [],
       truncated: false,
+      endAt: { chunkIndex, chunkOffset },
+      totalCapacitySamples: totalCap,
     };
   };
 
